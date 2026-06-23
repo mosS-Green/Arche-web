@@ -58,7 +58,9 @@ jobs:
       # 9. Build Release APK with Gradle
       - name: Build Release APK
         working-directory: ./android
-        run: ./gradlew assembleRelease
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
         env:
           ANDROID_KEYSTORE_FILE: arche-release.keystore
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
