@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Arché</string>
+    <string name="title_activity_main">Arché</string>
+    <string name="package_name">com.arche.app</string>
+    <string name="custom_url_scheme">com.arche.app</string>
+</resources>

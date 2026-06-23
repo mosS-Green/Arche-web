@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300..700;1,300..700&family=Outfit:wght@300..800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  --color-bg: oklch(0.12 0.015 250);
+  --color-surface: oklch(0.16 0.015 250);
+  --color-surface-hover: oklch(0.20 0.015 250);
+  --color-accent-personal: oklch(0.68 0.16 55);
+  --color-accent-work: oklch(0.72 0.14 185);
+  --color-danger: oklch(0.58 0.16 25);
+  --color-ink-primary: oklch(0.98 0.005 250);
+  --color-ink-secondary: oklch(0.70 0.01 250);
+  --color-ink-muted: oklch(0.48 0.01 250);
+  
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Base custom styles to respect user accessibility and standard reset details */
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink-primary);
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+    margin: 0;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Selection colors */
+  ::selection {
+    background-color: var(--color-accent-personal);
+    color: var(--color-bg);
+  }
+
+  /* Accessibility focus ring */
+  *:focus-visible {
+    outline: 2px solid var(--color-accent-personal);
+    outline-offset: 2px;
+  }
+  
+  /* Scrollbar customization */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-surface-hover);
+  }
+}
+
+/* Custom scrollbars for firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface) var(--color-bg);
+}
+
+/* Respect user preferences regarding motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-delay: 0s !important;
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
