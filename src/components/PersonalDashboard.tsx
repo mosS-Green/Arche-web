@@ -8,7 +8,8 @@ import {
   Plus, ArrowLeft, Flame, BookOpen, Heart, Compass, 
   Trophy, Quote as QuoteIcon, CheckCircle2, ChevronRight, Clock, Sparkles, Bookmark
 } from 'lucide-react';
-import { fetchDailyQuote, DailyQuote } from '../lib/inspiration';
+import { fetchDailyQuote } from '../lib/inspiration';
+import type { DailyQuote } from '../lib/inspiration';
 
 type PanelType = 'dashboard' | 'tasks' | 'reminders' | 'ideas' | 'quotes' | 'goals' | 'musings' | 'media' | 'hobbies';
 

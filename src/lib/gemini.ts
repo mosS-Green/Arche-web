@@ -57,9 +57,10 @@ Provide the output strictly matching the required JSON schema.`;
   const response = await client.interactions.create({
     model: "gemini-3.1-flash-lite",
     input: inputs,
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: {
+    response_format: {
+      type: "text",
+      mime_type: "application/json",
+      schema: {
         type: "OBJECT",
         properties: {
           categories: {
@@ -89,8 +90,8 @@ Provide the output strictly matching the required JSON schema.`;
         required: ["categories"]
       }
     },
-    thinkingConfig: {
-      thinkingLevel: "MEDIUM"
+    generation_config: {
+      thinking_level: "medium"
     }
   });
 
@@ -319,15 +320,16 @@ export async function structureContent(
   const response = await client.interactions.create({
     model: "gemini-3.1-flash-lite",
     input: inputs,
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: {
+    response_format: {
+      type: "text",
+      mime_type: "application/json",
+      schema: {
         type: "OBJECT",
         properties: responseProperties
       }
     },
-    thinkingConfig: {
-      thinkingLevel: "HIGH"
+    generation_config: {
+      thinking_level: "high"
     }
   });
 

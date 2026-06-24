@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { 
-  Camera, Mic, X, Check, Loader2, Play, Square, 
-  RefreshCw, Send, AlertCircle, FileText, Image as ImageIcon 
+  Camera, Mic, X, Check, Loader2, Square, 
+  RefreshCw, Send, AlertCircle, FileText, Sparkles
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { categorizeContent, structureContent } from '../lib/gemini';
@@ -35,13 +35,11 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
   // Media capture states
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   
   const [capturedBase64, setCapturedBase64] = useState<string | null>(null);
-  const [capturedMime, setCapturedMime] = useState<string>('');
   const [capturedType, setCapturedType] = useState<'image' | 'audio' | 'none'>('none');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -59,7 +57,6 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
       setErrorMsg(null);
       setComment('');
       setCapturedBase64(null);
-      setAudioBlob(null);
       setAudioUrl(null);
       
       if (initialIntent) {
@@ -69,7 +66,6 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
         } else if (initialIntent.type === 'share') {
           if (initialIntent.imageBase64) {
             setCapturedBase64(initialIntent.imageBase64);
-            setCapturedMime(initialIntent.mimeType || 'image/jpeg');
             setCapturedType('image');
             setMode('preview_image');
           } else if (initialIntent.text) {
@@ -155,7 +151,6 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
 
     const base64 = canvas.toDataURL('image/jpeg', 0.85);
     setCapturedBase64(base64);
-    setCapturedMime('image/jpeg');
     setCapturedType('image');
     setMode('preview_image');
     cleanupMedia();
@@ -176,7 +171,6 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
 
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'audio/mp3' });
-        setAudioBlob(blob);
         setAudioUrl(URL.createObjectURL(blob));
         
         // Convert blob to Base64 for Gemini
@@ -184,7 +178,6 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
         reader.readAsDataURL(blob);
         reader.onloadend = () => {
           setCapturedBase64(reader.result as string);
-          setCapturedMime('audio/mp3');
           setCapturedType('audio');
           setMode('preview_audio');
         };
@@ -317,7 +310,7 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
         <Dialog.Overlay className="fixed inset-0 bg-bg/85 backdrop-blur-md z-50 transition-opacity" />
         <Dialog.Content 
           className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-surface border border-surface rounded-2xl p-6 md:p-8 shadow-2xl z-50 outline-none max-h-[90vh] overflow-y-auto"
-          onOpenAutoFocus={(e) => {
+          onOpenAutoFocus={() => {
             // Let input handle focus if present
           }}
         >
@@ -527,7 +520,6 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
                   onClick={() => {
                     setCapturedBase64(null);
                     setAudioUrl(null);
-                    setAudioBlob(null);
                     setMode('microphone');
                     startRecording();
                   }}
