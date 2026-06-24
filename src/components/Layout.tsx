@@ -67,7 +67,7 @@ export const Layout: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-bg text-ink-primary flex flex-col md:flex-row relative">
+    <div className="min-h-screen text-ink-primary flex flex-col md:flex-row relative">
       {/* Toast Notification Container */}
       <div className="fixed top-6 right-6 z-[100] max-w-sm w-full space-y-3 pointer-events-none">
         <AnimatePresence>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { ItemFormModal } from './ItemFormModal';
 import { ItemContextMenu } from './ItemContextMenu';
@@ -58,6 +58,43 @@ export const PersonalDashboard: React.FC = () => {
 
   // FAB Menu state (when in dashboard mode)
   const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
+
+  const longPressTimeout = useRef<number | null>(null);
+  const isLongPressActive = useRef(false);
+
+  const startPress = () => {
+    isLongPressActive.current = false;
+    if (longPressTimeout.current) {
+      window.clearTimeout(longPressTimeout.current);
+    }
+    longPressTimeout.current = window.setTimeout(() => {
+      isLongPressActive.current = true;
+      setIsFabMenuOpen((prev) => !prev);
+    }, 500);
+  };
+
+  const endPress = () => {
+    if (longPressTimeout.current) {
+      window.clearTimeout(longPressTimeout.current);
+      longPressTimeout.current = null;
+    }
+    if (!isLongPressActive.current) {
+      if (activePanel === 'dashboard') {
+        setIsSmartCaptureOpen(true);
+      } else {
+        openCreateForm(getCategoryFromPanel(activePanel));
+      }
+    }
+    isLongPressActive.current = false;
+  };
+
+  const cancelPress = () => {
+    if (longPressTimeout.current) {
+      window.clearTimeout(longPressTimeout.current);
+      longPressTimeout.current = null;
+    }
+    isLongPressActive.current = false;
+  };
 
   // Load personal data on mount
   useEffect(() => {
@@ -405,31 +442,7 @@ export const PersonalDashboard: React.FC = () => {
               </div>
             )}
 
-            {/* Widget 3B: My Musings card (formerly Quotes card) */}
-            {quotes.length > 0 && (
-              <div 
-                className="bg-surface/30 border border-surface rounded-2xl p-6 space-y-6 hover:bg-surface/40 transition-colors cursor-pointer flex flex-col justify-between"
-                onClick={() => setActivePanel('quotes')}
-              >
-                <div className="flex justify-between items-center">
-                  <h3 className="font-display font-medium tracking-wide text-ink-primary flex items-center gap-2">
-                    <QuoteIcon className="w-4 h-4 text-accent-personal" /> My Musings
-                  </h3>
-                  <ChevronRight className="w-4 h-4 text-ink-muted" />
-                </div>
 
-                {quotes.slice(0, 1).map((q) => (
-                  <div key={q.id} className="space-y-4">
-                    <p className="font-display font-light text-lg italic text-ink-primary leading-snug">
-                      "{q.quote}"
-                    </p>
-                    <p className="text-xs text-ink-secondary font-mono text-right">
-                      — {q.author || 'Unknown'}{q.source ? `, ${q.source}` : ''}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
 
             {/* Widget 4: Ideas (Excitement/Difficulty visual cards) */}
             {ideas.length > 0 && (
@@ -1181,15 +1194,7 @@ export const PersonalDashboard: React.FC = () => {
                 <span className="block text-[9px] font-mono text-ink-muted uppercase px-2.5 py-1 tracking-wider border-b border-surface/50 mb-1">
                   Quick Log / Add
                 </span>
-                <button 
-                  onClick={() => {
-                    setIsSmartCaptureOpen(true);
-                    setIsFabMenuOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-display text-accent-personal hover:bg-surface-hover font-semibold flex items-center gap-1.5 cursor-pointer border-b border-surface/30 mb-1"
-                >
-                  <Sparkles className="w-3.5 h-3.5" /> Smart AI Capture
-                </button>
+
                 <button 
                   onClick={() => openCreateForm('personal_tasks')}
                   className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-display text-ink-primary hover:bg-surface-hover cursor-pointer"
@@ -1243,13 +1248,21 @@ export const PersonalDashboard: React.FC = () => {
           </AnimatePresence>
 
           <button
-            onClick={() => {
-              if (activePanel === 'dashboard') {
-                setIsFabMenuOpen(!isFabMenuOpen);
-              } else {
-                openCreateForm(getCategoryFromPanel(activePanel));
-              }
+            onMouseDown={(e) => {
+              if (e.button !== 0) return;
+              startPress();
             }}
+            onMouseUp={(e) => {
+              if (e.button !== 0) return;
+              endPress();
+            }}
+            onMouseLeave={cancelPress}
+            onTouchStart={startPress}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              endPress();
+            }}
+            onTouchMove={cancelPress}
             className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-accent-personal hover:bg-accent-personal/90 text-bg shadow-lg shadow-accent-personal/20 flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer"
             aria-label="Add entry"
           >

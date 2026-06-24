@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import type { WorkTask } from '../context/AppContext';
 import { ItemFormModal } from './ItemFormModal';
@@ -27,6 +27,39 @@ export const WorkWorkspace: React.FC = () => {
 
   // FAB sub-menu state
   const [isFabOpen, setIsFabOpen] = useState(false);
+
+  const longPressTimeout = useRef<number | null>(null);
+  const isLongPressActive = useRef(false);
+
+  const startPress = () => {
+    isLongPressActive.current = false;
+    if (longPressTimeout.current) {
+      window.clearTimeout(longPressTimeout.current);
+    }
+    longPressTimeout.current = window.setTimeout(() => {
+      isLongPressActive.current = true;
+      setIsFabOpen((prev) => !prev);
+    }, 500);
+  };
+
+  const endPress = () => {
+    if (longPressTimeout.current) {
+      window.clearTimeout(longPressTimeout.current);
+      longPressTimeout.current = null;
+    }
+    if (!isLongPressActive.current) {
+      setIsSmartCaptureOpen(true);
+    }
+    isLongPressActive.current = false;
+  };
+
+  const cancelPress = () => {
+    if (longPressTimeout.current) {
+      window.clearTimeout(longPressTimeout.current);
+      longPressTimeout.current = null;
+    }
+    isLongPressActive.current = false;
+  };
 
   // Load data on mount
   useEffect(() => {
@@ -424,15 +457,7 @@ export const WorkWorkspace: React.FC = () => {
                 <span className="block text-[9px] font-mono text-ink-muted uppercase px-2.5 py-1 tracking-wider border-b border-surface/50 mb-1">
                   Add Work Item
                 </span>
-                <button 
-                  onClick={() => {
-                    setIsSmartCaptureOpen(true);
-                    setIsFabOpen(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-display text-accent-work hover:bg-surface-hover font-semibold flex items-center gap-1.5 cursor-pointer border-b border-surface/30 mb-1"
-                >
-                  <Sparkles className="w-3.5 h-3.5" /> Smart AI Capture
-                </button>
+
                 <button 
                   onClick={() => openCreateForm('work_tasks')}
                   className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-display text-ink-primary hover:bg-surface-hover cursor-pointer"
@@ -456,7 +481,21 @@ export const WorkWorkspace: React.FC = () => {
           </AnimatePresence>
 
           <button
-            onClick={() => setIsFabOpen(!isFabOpen)}
+            onMouseDown={(e) => {
+              if (e.button !== 0) return;
+              startPress();
+            }}
+            onMouseUp={(e) => {
+              if (e.button !== 0) return;
+              endPress();
+            }}
+            onMouseLeave={cancelPress}
+            onTouchStart={startPress}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              endPress();
+            }}
+            onTouchMove={cancelPress}
             className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-accent-work hover:bg-accent-work/90 text-bg shadow-lg shadow-accent-work/20 flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer"
             aria-label="Add work item"
           >

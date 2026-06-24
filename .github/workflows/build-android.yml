@@ -39,12 +39,29 @@ jobs:
       - name: Install npm dependencies
         run: npm install
 
+      # 5.5 Verify secrets are set
+      - name: Verify build secrets
+        run: |
+          if [ -z "${{ secrets.VITE_GEMINI_API_KEY }}" ]; then
+            echo "::error::VITE_GEMINI_API_KEY secret is not set in GitHub repository secrets!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
+            echo "::error::VITE_SUPABASE_URL secret is not set!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
+            echo "::error::VITE_SUPABASE_ANON_KEY secret is not set!"
+            exit 1
+          fi
+
       # 6. Build the Vite web app
       - name: Build web app
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
 
       # 7. Sync Capacitor (copies dist/ into android/)
       - name: Capacitor Sync

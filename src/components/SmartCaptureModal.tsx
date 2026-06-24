@@ -59,25 +59,19 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
       setCapturedBase64(null);
       setAudioUrl(null);
       
-      if (initialIntent) {
-        if (initialIntent.type === 'qs_camera') {
-          setMode('camera');
-          startCamera();
-        } else if (initialIntent.type === 'share') {
-          if (initialIntent.imageBase64) {
-            setCapturedBase64(initialIntent.imageBase64);
-            setCapturedType('image');
-            setMode('preview_image');
-          } else if (initialIntent.text) {
-            setComment(initialIntent.text);
-            setCapturedType('none');
-            setMode('preview_text');
-          }
-        } else {
-          setMode('choice');
+      if (initialIntent && initialIntent.type === 'share') {
+        if (initialIntent.imageBase64) {
+          setCapturedBase64(initialIntent.imageBase64);
+          setCapturedType('image');
+          setMode('preview_image');
+        } else if (initialIntent.text) {
+          setComment(initialIntent.text);
+          setCapturedType('none');
+          setMode('preview_text');
         }
       } else {
-        setMode('choice');
+        setMode('camera');
+        startCamera();
       }
     } else {
       cleanupMedia();
@@ -133,8 +127,9 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
       }
     } catch (err: any) {
       console.error('Camera access denied:', err);
-      setErrorMsg('Could not access device camera. Please check browser permissions.');
-      setMode('choice');
+      setErrorMsg('Camera access denied. Switching to voice recorder...');
+      setMode('microphone');
+      startRecording();
     }
   };
 
@@ -191,8 +186,9 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
       setIsRecording(true);
     } catch (err: any) {
       console.error('Microphone access denied:', err);
-      setErrorMsg('Could not access microphone. Please check browser permissions.');
-      setMode('choice');
+      setErrorMsg('Could not access microphone. Switching to camera...');
+      setMode('camera');
+      startCamera();
     }
   };
 
@@ -224,7 +220,8 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
 
       if (!catResult.categories || catResult.categories.length === 0) {
         addToast('info', 'No Action Taken', 'The AI did not find any matching category for this content.');
-        setMode('choice');
+        setMode('camera');
+        startCamera();
         return;
       }
 
@@ -293,8 +290,8 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
     } catch (err: any) {
       console.error('Smart Capture Pipeline failed:', err);
       setErrorMsg(err.message || 'An error occurred during Gemini AI processing.');
-      setMode('choice');
-      cleanupMedia();
+      setMode('camera');
+      startCamera();
     }
   };
 
@@ -338,49 +335,10 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
 
           {/* CONTENT MODES */}
           
-          {/* Mode 1: Choice */}
-          {mode === 'choice' && (
-            <div className="space-y-6 py-4">
-              <p className="text-sm font-display text-ink-secondary text-center leading-relaxed">
-                Capture notes, tasks, or reminders using the camera or microphone. Arché AI will categorize and structure it into your database.
-              </p>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => {
-                    setMode('camera');
-                    startCamera();
-                  }}
-                  className="flex flex-col items-center justify-center p-6 bg-surface/40 hover:bg-surface-hover border border-surface rounded-2xl transition-all group cursor-pointer space-y-3"
-                >
-                  <div className="p-3 bg-accent-personal/10 text-accent-personal rounded-xl group-hover:scale-105 transition-transform">
-                    <Camera className="w-6 h-6" />
-                  </div>
-                  <span className="text-sm font-display font-medium text-ink-primary">Use Camera</span>
-                  <span className="text-[10px] font-mono text-ink-muted uppercase">Snap Photo</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setMode('microphone');
-                    startRecording();
-                  }}
-                  className="flex flex-col items-center justify-center p-6 bg-surface/40 hover:bg-surface-hover border border-surface rounded-2xl transition-all group cursor-pointer space-y-3"
-                >
-                  <div className="p-3 bg-accent-work/10 text-accent-work rounded-xl group-hover:scale-105 transition-transform">
-                    <Mic className="w-6 h-6" />
-                  </div>
-                  <span className="text-sm font-display font-medium text-ink-primary">Use Voice</span>
-                  <span className="text-[10px] font-mono text-ink-muted uppercase">Record Audio</span>
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Mode 2: Camera View */}
           {mode === 'camera' && (
             <div className="space-y-6">
-              <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-surface shadow-inner">
+              <div className="relative aspect-[3/4] max-h-[50vh] bg-black rounded-xl overflow-hidden border border-surface shadow-inner">
                 <video 
                   ref={videoRef} 
                   autoPlay 
@@ -390,18 +348,29 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
                 <canvas ref={canvasRef} className="hidden" />
               </div>
 
-              <div className="flex justify-center gap-4">
+              <div className="flex justify-center items-center gap-4">
                 <button
-                  onClick={() => setMode('choice')}
+                  onClick={onClose}
                   className="px-5 py-2.5 bg-surface hover:bg-surface-hover rounded-xl text-xs font-mono uppercase text-ink-secondary cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={captureSnapshot}
-                  className="px-6 py-2.5 bg-accent-personal text-bg rounded-xl text-xs font-mono uppercase font-semibold hover:bg-accent-personal/90 cursor-pointer transition-transform hover:scale-[1.02]"
+                  className="px-6 py-2.5 bg-accent-personal text-bg rounded-xl text-xs font-mono uppercase font-semibold hover:bg-accent-personal/90 cursor-pointer transition-transform hover:scale-[1.02] flex items-center gap-1.5"
                 >
-                  Capture Photo
+                  <Camera className="w-4 h-4" /> Capture Photo
+                </button>
+                <button
+                  onClick={() => {
+                    cleanupMedia();
+                    setMode('microphone');
+                    startRecording();
+                  }}
+                  className="p-3 bg-surface hover:bg-surface-hover rounded-xl text-ink-primary cursor-pointer transition-colors"
+                  title="Switch to Voice Recording"
+                >
+                  <Mic className="w-5 h-5 text-accent-work" />
                 </button>
               </div>
             </div>
@@ -432,7 +401,8 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
                 <button
                   onClick={() => {
                     cleanupMedia();
-                    setMode('choice');
+                    setMode('camera');
+                    startCamera();
                   }}
                   className="px-5 py-2.5 bg-surface hover:bg-surface-hover rounded-xl text-xs font-mono uppercase text-ink-secondary cursor-pointer"
                 >
@@ -452,7 +422,7 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
           {mode === 'preview_image' && (
             <div className="space-y-6">
               {capturedBase64 && (
-                <div className="relative aspect-video rounded-xl overflow-hidden border border-surface shadow-md">
+                <div className="relative aspect-[3/4] max-h-[50vh] rounded-xl overflow-hidden border border-surface shadow-md">
                   <img src={capturedBase64} alt="Captured preview" className="w-full h-full object-cover" />
                   <button
                     onClick={() => {
@@ -484,7 +454,8 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
                 <button
                   onClick={() => {
                     cleanupMedia();
-                    setMode('choice');
+                    setMode('camera');
+                    startCamera();
                   }}
                   className="px-5 py-2.5 bg-surface hover:bg-surface-hover rounded-xl text-xs font-mono uppercase text-ink-secondary cursor-pointer"
                 >
@@ -546,7 +517,8 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
                 <button
                   onClick={() => {
                     cleanupMedia();
-                    setMode('choice');
+                    setMode('camera');
+                    startCamera();
                   }}
                   className="px-5 py-2.5 bg-surface hover:bg-surface-hover rounded-xl text-xs font-mono uppercase text-ink-secondary cursor-pointer"
                 >
@@ -590,7 +562,7 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
                 <button
                   onClick={() => {
                     cleanupMedia();
-                    setMode('choice');
+                    onClose();
                   }}
                   className="px-5 py-2.5 bg-surface hover:bg-surface-hover rounded-xl text-xs font-mono uppercase text-ink-secondary cursor-pointer"
                 >
