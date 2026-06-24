@@ -37,7 +37,7 @@ jobs:
 
       # 5. Install Node dependencies
       - name: Install npm dependencies
-        run: npm ci
+        run: npm install
 
       # 6. Build the Vite web app
       - name: Build web app
