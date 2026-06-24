@@ -23,10 +23,9 @@ export async function categorizeContent(
     const rawData = mediaBase64.includes(',') ? mediaBase64.split(',')[1] : mediaBase64;
     const mimeType = mediaType === 'image' ? 'image/jpeg' : 'audio/mp3';
     inputs.push({
-      inlineData: {
-        data: rawData,
-        mimeType: mimeType
-      }
+      type: mediaType,
+      data: rawData,
+      mime_type: mimeType
     });
   }
 
@@ -48,10 +47,16 @@ The possible categories are:
 Choose ALL that apply. For example, if a user captures a whiteboard and comments "Remember to send layout update to team and buy milk", that belongs to both 'work_tasks' and 'personal_tasks'.
 Provide the output strictly matching the required JSON schema.`;
 
-  inputs.push(promptText);
+  inputs.push({
+    type: "text",
+    text: promptText
+  });
 
   if (comment) {
-    inputs.push(`User Comment/Context: ${comment}`);
+    inputs.push({
+      type: "text",
+      text: `User Comment/Context: ${comment}`
+    });
   }
 
   const response = await client.interactions.create({
@@ -61,12 +66,12 @@ Provide the output strictly matching the required JSON schema.`;
       type: "text",
       mime_type: "application/json",
       schema: {
-        type: "OBJECT",
+        type: "object",
         properties: {
           categories: {
-            type: "ARRAY",
+            type: "array",
             items: {
-              type: "STRING",
+              type: "string",
               enum: [
                 "personal_tasks",
                 "personal_reminders",
@@ -83,7 +88,7 @@ Provide the output strictly matching the required JSON schema.`;
             }
           },
           reasoning: {
-            type: "STRING",
+            type: "string",
             description: "Brief explanation of why these categories were selected."
           }
         },
@@ -116,153 +121,153 @@ export async function structureContent(
   // Define schemas for all possible tables
   const schemas: Record<string, any> = {
     personal_tasks: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        title: { type: "STRING" },
-        description: { type: "STRING" },
-        category: { type: "STRING" },
-        priority: { type: "STRING", enum: ["Low", "Medium", "High", "Critical"] },
-        deadline: { type: "STRING", description: "Format: YYYY-MM-DD" },
-        status: { type: "STRING", enum: ["To Do", "In Progress", "Done"] },
-        energy_required: { type: "STRING", enum: ["Low", "Medium", "High"] },
-        tags: { type: "ARRAY", items: { type: "STRING" } }
+        title: { type: "string" },
+        description: { type: "string" },
+        category: { type: "string" },
+        priority: { type: "string", enum: ["Low", "Medium", "High", "Critical"] },
+        deadline: { type: "string", description: "Format: YYYY-MM-DD" },
+        status: { type: "string", enum: ["To Do", "In Progress", "Done"] },
+        energy_required: { type: "string", enum: ["Low", "Medium", "High"] },
+        tags: { type: "array", items: { type: "string" } }
       },
       required: ["title", "category", "priority", "status", "energy_required"]
     },
     personal_reminders: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        title: { type: "STRING" },
-        description: { type: "STRING" },
-        type: { type: "STRING", enum: ["One Time", "Daily", "Weekly", "Monthly"] },
-        date: { type: "STRING", description: "Format: YYYY-MM-DD" },
-        time: { type: "STRING", description: "Format: HH:MM:SS" },
-        repeat_until: { type: "STRING", description: "Format: YYYY-MM-DD" }
+        title: { type: "string" },
+        description: { type: "string" },
+        type: { type: "string", enum: ["One Time", "Daily", "Weekly", "Monthly"] },
+        date: { type: "string", description: "Format: YYYY-MM-DD" },
+        time: { type: "string", description: "Format: HH:MM:SS" },
+        repeat_until: { type: "string", description: "Format: YYYY-MM-DD" }
       },
       required: ["title", "type", "date"]
     },
     ideas: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        title: { type: "STRING" },
-        description: { type: "STRING" },
-        category: { type: "STRING" },
-        excitement: { type: "INTEGER", description: "1 to 5 rating" },
-        difficulty: { type: "INTEGER", description: "1 to 5 rating" },
-        status: { type: "STRING", enum: ["Draft", "Refined", "Active", "Completed", "Shelved"] },
-        related_hobby: { type: "STRING" },
-        tags: { type: "ARRAY", items: { type: "STRING" } }
+        title: { type: "string" },
+        description: { type: "string" },
+        category: { type: "string" },
+        excitement: { type: "integer", description: "1 to 5 rating" },
+        difficulty: { type: "integer", description: "1 to 5 rating" },
+        status: { type: "string", enum: ["Draft", "Refined", "Active", "Completed", "Shelved"] },
+        related_hobby: { type: "string" },
+        tags: { type: "array", items: { type: "string" } }
       },
       required: ["title", "category", "excitement", "difficulty", "status"]
     },
     quotes: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        quote: { type: "STRING", description: "The quote text or general musing text" },
-        author: { type: "STRING", description: "Author of the quote or source thought (optional)" },
-        source: { type: "STRING", description: "Source book, site, or reference (optional)" },
-        category: { type: "STRING" },
-        personal_thoughts: { type: "STRING", description: "My own personal thoughts or reflections on this" },
-        tags: { type: "ARRAY", items: { type: "STRING" } },
-        favourite: { type: "BOOLEAN" }
+        quote: { type: "string", description: "The quote text or general musing text" },
+        author: { type: "string", description: "Author of the quote or source thought (optional)" },
+        source: { type: "string", description: "Source book, site, or reference (optional)" },
+        category: { type: "string" },
+        personal_thoughts: { type: "string", description: "My own personal thoughts or reflections on this" },
+        tags: { type: "array", items: { type: "string" } },
+        favourite: { type: "boolean" }
       },
       required: ["quote", "category"]
     },
     goals_plans: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        title: { type: "STRING" },
-        description: { type: "STRING" },
-        target_date: { type: "STRING", description: "Format: YYYY-MM-DD" },
-        progress: { type: "INTEGER", description: "0 to 100 percentage" },
-        status: { type: "STRING", enum: ["Not Started", "In Progress", "Achieved", "Paused"] },
+        title: { type: "string" },
+        description: { type: "string" },
+        target_date: { type: "string", description: "Format: YYYY-MM-DD" },
+        progress: { type: "integer", description: "0 to 100 percentage" },
+        status: { type: "string", enum: ["Not Started", "In Progress", "Achieved", "Paused"] },
         milestones: {
-          type: "ARRAY",
+          type: "array",
           items: {
-            type: "OBJECT",
+            type: "object",
             properties: {
-              text: { type: "STRING" },
-              completed: { type: "BOOLEAN" }
+              text: { type: "string" },
+              completed: { type: "boolean" }
             },
             required: ["text", "completed"]
           }
         },
-        related_hobby: { type: "STRING" }
+        related_hobby: { type: "string" }
       },
       required: ["title", "target_date", "progress", "status"]
     },
     musings: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        title: { type: "STRING", description: "Optional journal log title" },
-        body: { type: "STRING", description: "Journal body text" },
-        mood: { type: "STRING", description: "Overall mood (e.g. Calm, Reflective, Stressed)" },
-        tags: { type: "ARRAY", items: { type: "STRING" } },
-        favourite: { type: "BOOLEAN" }
+        title: { type: "string", description: "Optional journal log title" },
+        body: { type: "string", description: "Journal body text" },
+        mood: { type: "string", description: "Overall mood (e.g. Calm, Reflective, Stressed)" },
+        tags: { type: "array", items: { type: "string" } },
+        favourite: { type: "boolean" }
       },
       required: ["body", "mood"]
     },
     media: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        title: { type: "STRING" },
-        type: { type: "STRING", enum: ["Music", "Book", "Series", "Movie", "Game"] },
-        status: { type: "STRING", enum: ["Backlog", "Consuming", "Completed", "Abandoned"] },
-        rating: { type: "INTEGER", description: "1 to 5 rating" },
-        progress: { type: "INTEGER" },
-        genre: { type: "STRING" },
-        thoughts: { type: "STRING" },
-        recommendation_source: { type: "STRING" }
+        title: { type: "string" },
+        type: { type: "string", enum: ["Music", "Book", "Series", "Movie", "Game"] },
+        status: { type: "string", enum: ["Backlog", "Consuming", "Completed", "Abandoned"] },
+        rating: { type: "integer", description: "1 to 5 rating" },
+        progress: { type: "integer" },
+        genre: { type: "string" },
+        thoughts: { type: "string" },
+        recommendation_source: { type: "string" }
       },
       required: ["title", "type", "status"]
     },
     hobbies: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        hobby: { type: "STRING" },
-        duration: { type: "INTEGER", description: "Duration in minutes" },
-        notes: { type: "STRING" },
-        enjoyment: { type: "INTEGER", description: "1 to 5 rating" },
-        difficulty: { type: "INTEGER", description: "1 to 5 rating" },
-        tags: { type: "ARRAY", items: { type: "STRING" } }
+        hobby: { type: "string" },
+        duration: { type: "integer", description: "Duration in minutes" },
+        notes: { type: "string" },
+        enjoyment: { type: "integer", description: "1 to 5 rating" },
+        difficulty: { type: "integer", description: "1 to 5 rating" },
+        tags: { type: "array", items: { type: "string" } }
       },
       required: ["hobby", "duration", "enjoyment", "difficulty"]
     },
     work_tasks: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        title: { type: "STRING" },
-        description: { type: "STRING" },
-        priority: { type: "STRING", enum: ["Low", "Medium", "High", "Critical"] },
-        status: { type: "STRING", enum: ["To Do", "In Progress", "Done"] },
-        deadline: { type: "STRING", description: "Format: YYYY-MM-DD" },
-        time: { type: "STRING", description: "Format: HH:MM:SS" },
-        estimated_duration: { type: "INTEGER", description: "Duration in minutes" },
-        notes: { type: "STRING" },
-        tags: { type: "ARRAY", items: { type: "STRING" } }
+        title: { type: "string" },
+        description: { type: "string" },
+        priority: { type: "string", enum: ["Low", "Medium", "High", "Critical"] },
+        status: { type: "string", enum: ["To Do", "In Progress", "Done"] },
+        deadline: { type: "string", description: "Format: YYYY-MM-DD" },
+        time: { type: "string", description: "Format: HH:MM:SS" },
+        estimated_duration: { type: "integer", description: "Duration in minutes" },
+        notes: { type: "string" },
+        tags: { type: "array", items: { type: "string" } }
       },
       required: ["title", "priority", "status"]
     },
     work_reminders: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        title: { type: "STRING" },
-        description: { type: "STRING" },
-        type: { type: "STRING", enum: ["One Time", "Daily", "Weekly", "Monthly"] },
-        date: { type: "STRING", description: "Format: YYYY-MM-DD" },
-        time: { type: "STRING", description: "Format: HH:MM:SS" },
-        repeat_until: { type: "STRING", description: "Format: YYYY-MM-DD" }
+        title: { type: "string" },
+        description: { type: "string" },
+        type: { type: "string", enum: ["One Time", "Daily", "Weekly", "Monthly"] },
+        date: { type: "string", description: "Format: YYYY-MM-DD" },
+        time: { type: "string", description: "Format: HH:MM:SS" },
+        repeat_until: { type: "string", description: "Format: YYYY-MM-DD" }
       },
       required: ["title", "type", "date"]
     },
     work_notes: {
-      type: "OBJECT",
+      type: "object",
       properties: {
-        title: { type: "STRING" },
-        body: { type: "STRING" },
-        project: { type: "STRING" },
-        pin: { type: "BOOLEAN" },
-        tags: { type: "ARRAY", items: { type: "STRING" } }
+        title: { type: "string" },
+        body: { type: "string" },
+        project: { type: "string" },
+        pin: { type: "boolean" },
+        tags: { type: "array", items: { type: "string" } }
       },
       required: ["title"]
     }
@@ -289,7 +294,7 @@ export async function structureContent(
   for (const cat of categories) {
     if (schemas[cat]) {
       responseProperties[cat] = {
-        type: "ARRAY",
+        type: "array",
         items: schemas[cat]
       };
       systemPromptCombined += `- For '${cat}': ${systemInstructions[cat]}\n`;
@@ -304,17 +309,22 @@ export async function structureContent(
     const rawData = mediaBase64.includes(',') ? mediaBase64.split(',')[1] : mediaBase64;
     const mimeType = mediaType === 'image' ? 'image/jpeg' : 'audio/mp3';
     inputs.push({
-      inlineData: {
-        data: rawData,
-        mimeType: mimeType
-      }
+      type: mediaType,
+      data: rawData,
+      mime_type: mimeType
     });
   }
 
-  inputs.push(systemPromptCombined);
+  inputs.push({
+    type: "text",
+    text: systemPromptCombined
+  });
 
   if (comment) {
-    inputs.push(`User Comments/Context: ${comment}`);
+    inputs.push({
+      type: "text",
+      text: `User Comments/Context: ${comment}`
+    });
   }
 
   const response = await client.interactions.create({
@@ -324,7 +334,7 @@ export async function structureContent(
       type: "text",
       mime_type: "application/json",
       schema: {
-        type: "OBJECT",
+        type: "object",
         properties: responseProperties
       }
     },
