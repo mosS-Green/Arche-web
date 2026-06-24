@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { ItemFormModal } from './ItemFormModal';
 import { ItemContextMenu } from './ItemContextMenu';
+import { SmartCaptureModal } from './SmartCaptureModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, ArrowLeft, Flame, BookOpen, Heart, Compass, 
-  Trophy, Quote as QuoteIcon, CheckCircle2, ChevronRight, Clock, Sparkles
+  Trophy, Quote as QuoteIcon, CheckCircle2, ChevronRight, Clock, Sparkles, Bookmark
 } from 'lucide-react';
+import { fetchDailyQuote, DailyQuote } from '../lib/inspiration';
 
 type PanelType = 'dashboard' | 'tasks' | 'reminders' | 'ideas' | 'quotes' | 'goals' | 'musings' | 'media' | 'hobbies';
 
@@ -21,15 +23,37 @@ export const PersonalDashboard: React.FC = () => {
     musings,
     media,
     hobbies,
-    profile
+    profile,
+    saveItem
   } = useApp();
 
   const [activePanel, setActivePanel] = useState<PanelType>('dashboard');
+  const [dailyQuote, setDailyQuote] = useState<DailyQuote | null>(null);
+
+  // Fetch daily quote on mount
+  useEffect(() => {
+    fetchDailyQuote()
+      .then(setDailyQuote)
+      .catch((err) => console.error("Failed to fetch daily quote:", err));
+  }, []);
+
+  const handleSaveDailyQuote = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!dailyQuote) return;
+    await saveItem('quotes', {
+      quote: dailyQuote.quote,
+      author: dailyQuote.author,
+      category: 'Inspiration',
+      favourite: false,
+      tags: ['inspiration']
+    });
+  };
   
   // Modal Edit/Create states
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formCategory, setFormCategory] = useState('personal_tasks');
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [isSmartCaptureOpen, setIsSmartCaptureOpen] = useState(false);
 
   // FAB Menu state (when in dashboard mode)
   const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
@@ -204,7 +228,7 @@ export const PersonalDashboard: React.FC = () => {
               onClick={() => setActivePanel('quotes')} 
               className={`hover:text-ink-primary transition-colors ${activePanel === 'quotes' ? 'text-accent-personal border-b border-accent-personal pb-1 font-bold' : ''}`}
             >
-              Quotes
+              Musings
             </button>
             <button 
               onClick={() => setActivePanel('musings')} 
@@ -351,7 +375,36 @@ export const PersonalDashboard: React.FC = () => {
               </div>
             )}
 
-            {/* Widget 3: Quotes card */}
+            {/* Widget 3A: Daily Inspiration Card (API quote) */}
+            {dailyQuote && (
+              <div 
+                className="bg-surface/30 border border-surface rounded-2xl p-6 space-y-6 flex flex-col justify-between relative group hover:bg-surface/40 transition-colors"
+              >
+                <div className="flex justify-between items-center">
+                  <h3 className="font-display font-medium tracking-wide text-ink-primary flex items-center gap-2">
+                    <QuoteIcon className="w-4 h-4 text-accent-personal" /> Daily Inspiration
+                  </h3>
+                  <button
+                    onClick={handleSaveDailyQuote}
+                    className="p-1.5 hover:bg-surface-hover rounded-full transition-colors duration-200 cursor-pointer text-ink-muted hover:text-accent-personal group/btn"
+                    title="Save to Musings"
+                  >
+                    <Bookmark className="w-4 h-4 transition-transform group-hover/btn:scale-110" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="font-display font-light text-lg italic text-ink-primary leading-snug">
+                    "{dailyQuote.quote}"
+                  </p>
+                  <p className="text-xs text-ink-secondary font-mono text-right">
+                    — {dailyQuote.author}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Widget 3B: My Musings card (formerly Quotes card) */}
             {quotes.length > 0 && (
               <div 
                 className="bg-surface/30 border border-surface rounded-2xl p-6 space-y-6 hover:bg-surface/40 transition-colors cursor-pointer flex flex-col justify-between"
@@ -359,7 +412,7 @@ export const PersonalDashboard: React.FC = () => {
               >
                 <div className="flex justify-between items-center">
                   <h3 className="font-display font-medium tracking-wide text-ink-primary flex items-center gap-2">
-                    <QuoteIcon className="w-4 h-4 text-accent-personal" /> Inspiration
+                    <QuoteIcon className="w-4 h-4 text-accent-personal" /> My Musings
                   </h3>
                   <ChevronRight className="w-4 h-4 text-ink-muted" />
                 </div>
@@ -416,7 +469,7 @@ export const PersonalDashboard: React.FC = () => {
               >
                 <div className="flex justify-between items-center">
                   <h3 className="font-display font-medium tracking-wide text-ink-primary flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-accent-personal" /> Journal musings
+                    <Heart className="w-4 h-4 text-accent-personal" /> Journal Logs
                   </h3>
                   <ChevronRight className="w-4 h-4 text-ink-muted" />
                 </div>
@@ -817,19 +870,19 @@ export const PersonalDashboard: React.FC = () => {
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </button>
-                <h2 className="text-2xl font-display font-normal text-ink-primary">Inspirational Quotes</h2>
+                <h2 className="text-2xl font-display font-normal text-ink-primary">Musings</h2>
               </div>
               <button
                 onClick={() => openCreateForm('quotes')}
                 className="flex items-center gap-1.5 text-xs font-mono tracking-wider uppercase bg-accent-personal text-bg px-4 py-2 rounded-lg cursor-pointer transition-transform hover:scale-[1.02]"
               >
-                <Plus className="w-4 h-4" /> Add Quote
+                <Plus className="w-4 h-4" /> Add Musing
               </button>
             </div>
 
             <div className="space-y-6">
               {quotes.length === 0 ? (
-                <p className="text-xs font-mono text-ink-muted italic">No quotes added.</p>
+                <p className="text-xs font-mono text-ink-muted italic">No musings added.</p>
               ) : (
                 quotes.map((q) => (
                   <ItemContextMenu 
@@ -1113,7 +1166,7 @@ export const PersonalDashboard: React.FC = () => {
       </AnimatePresence>
 
       {/* Floating Action Button (FAB) */}
-      <div className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-40">
+      <div className="fixed bottom-20 right-6 md:bottom-8 md:right-8 z-40">
         <div className="relative">
           {/* Quick create menu (only works on dashboard) */}
           <AnimatePresence>
@@ -1127,6 +1180,15 @@ export const PersonalDashboard: React.FC = () => {
                 <span className="block text-[9px] font-mono text-ink-muted uppercase px-2.5 py-1 tracking-wider border-b border-surface/50 mb-1">
                   Quick Log / Add
                 </span>
+                <button 
+                  onClick={() => {
+                    setIsSmartCaptureOpen(true);
+                    setIsFabMenuOpen(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-display text-accent-personal hover:bg-surface-hover font-semibold flex items-center gap-1.5 cursor-pointer border-b border-surface/30 mb-1"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> Smart AI Capture
+                </button>
                 <button 
                   onClick={() => openCreateForm('personal_tasks')}
                   className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-display text-ink-primary hover:bg-surface-hover cursor-pointer"
@@ -1155,7 +1217,7 @@ export const PersonalDashboard: React.FC = () => {
                   onClick={() => openCreateForm('quotes')}
                   className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-display text-ink-primary hover:bg-surface-hover cursor-pointer"
                 >
-                  Inspirational Quote
+                  Musing
                 </button>
                 <button 
                   onClick={() => openCreateForm('musings')}
@@ -1201,6 +1263,12 @@ export const PersonalDashboard: React.FC = () => {
         onClose={() => setIsFormOpen(false)}
         category={formCategory}
         item={editingItem}
+      />
+
+      {/* Smart Capture Modal */}
+      <SmartCaptureModal
+        isOpen={isSmartCaptureOpen}
+        onClose={() => setIsSmartCaptureOpen(false)}
       />
     </div>
   );

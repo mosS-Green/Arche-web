@@ -1,15 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Briefcase, User as UserIcon, X, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 import { PersonalDashboard } from './PersonalDashboard';
 import { WorkWorkspace } from './WorkWorkspace';
+import { registerPlugin } from '@capacitor/core';
+import { SmartCaptureModal } from './SmartCaptureModal';
+
+export interface IntentData {
+  type: 'none' | 'qs_camera' | 'share';
+  mimeType?: string;
+  text?: string;
+  imageUri?: string;
+  imageBase64?: string;
+}
+
+export interface IntentHandlerPlugin {
+  getLaunchIntent(): Promise<IntentData>;
+  clearIntent(): Promise<void>;
+}
+
+const IntentHandler = registerPlugin<IntentHandlerPlugin>('IntentHandler');
 
 export const Layout: React.FC = () => {
   const { profile, toasts, removeToast } = useApp();
   const [currentTab, setCurrentTab] = useState<'personal' | 'work'>('personal');
+  const [isSmartCaptureOpen, setIsSmartCaptureOpen] = useState(false);
+  const [activeIntent, setActiveIntent] = useState<IntentData | null>(null);
 
   const username = profile?.display_name || 'Personal';
+
+  useEffect(() => {
+    const handleIntent = (intent: IntentData) => {
+      if (intent && intent.type !== 'none') {
+        setActiveIntent(intent);
+        setIsSmartCaptureOpen(true);
+      }
+    };
+
+    // Check launch intent on startup
+    const checkLaunchIntent = async () => {
+      try {
+        const intent = await IntentHandler.getLaunchIntent();
+        if (intent && intent.type !== 'none') {
+          handleIntent(intent);
+          await IntentHandler.clearIntent();
+        }
+      } catch (e) {
+        console.warn('Failed to fetch launch intent:', e);
+      }
+    };
+    
+    checkLaunchIntent();
+
+    // Listen for intents while the app is active/backgrounded
+    const listener = (IntentHandler as any).addListener('onNewIntent', async (intent: IntentData) => {
+      if (intent && intent.type !== 'none') {
+        handleIntent(intent);
+        await IntentHandler.clearIntent();
+      }
+    });
+
+    return () => {
+      listener.remove();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-bg text-ink-primary flex flex-col md:flex-row relative">
@@ -150,6 +205,16 @@ export const Layout: React.FC = () => {
         </button>
 
       </nav>
+
+      {/* Smart Capture Modal for Intents */}
+      <SmartCaptureModal
+        isOpen={isSmartCaptureOpen}
+        onClose={() => {
+          setIsSmartCaptureOpen(false);
+          setActiveIntent(null);
+        }}
+        initialIntent={activeIntent}
+      />
     </div>
   );
 };

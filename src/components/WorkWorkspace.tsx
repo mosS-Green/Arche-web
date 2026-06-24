@@ -3,10 +3,11 @@ import { useApp } from '../context/AppContext';
 import type { WorkTask } from '../context/AppContext';
 import { ItemFormModal } from './ItemFormModal';
 import { ItemContextMenu } from './ItemContextMenu';
+import { SmartCaptureModal } from './SmartCaptureModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Pin, CheckCircle2, Circle, Play, AlertCircle, 
-  Clock, FileText
+  Clock, FileText, Sparkles
 } from 'lucide-react';
 
 export const WorkWorkspace: React.FC = () => {
@@ -22,6 +23,7 @@ export const WorkWorkspace: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formCategory, setFormCategory] = useState('work_tasks');
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [isSmartCaptureOpen, setIsSmartCaptureOpen] = useState(false);
 
   // FAB sub-menu state
   const [isFabOpen, setIsFabOpen] = useState(false);
@@ -408,7 +410,7 @@ export const WorkWorkspace: React.FC = () => {
       </div>
 
       {/* FAB Button - Work Workspace */}
-      <div className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-40">
+      <div className="fixed bottom-20 right-6 md:bottom-8 md:right-8 z-40">
         <div className="relative">
           {/* Sub menu controls */}
           <AnimatePresence>
@@ -422,6 +424,15 @@ export const WorkWorkspace: React.FC = () => {
                 <span className="block text-[9px] font-mono text-ink-muted uppercase px-2.5 py-1 tracking-wider border-b border-surface/50 mb-1">
                   Add Work Item
                 </span>
+                <button 
+                  onClick={() => {
+                    setIsSmartCaptureOpen(true);
+                    setIsFabOpen(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-display text-accent-work hover:bg-surface-hover font-semibold flex items-center gap-1.5 cursor-pointer border-b border-surface/30 mb-1"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> Smart AI Capture
+                </button>
                 <button 
                   onClick={() => openCreateForm('work_tasks')}
                   className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-display text-ink-primary hover:bg-surface-hover cursor-pointer"
@@ -460,6 +471,12 @@ export const WorkWorkspace: React.FC = () => {
         onClose={() => setIsFormOpen(false)}
         category={formCategory}
         item={editingItem}
+      />
+
+      {/* Smart Capture Modal */}
+      <SmartCaptureModal
+        isOpen={isSmartCaptureOpen}
+        onClose={() => setIsSmartCaptureOpen(false)}
       />
     </div>
   );

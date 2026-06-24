@@ -146,9 +146,9 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       case 'personal_tasks': return `${editPrefix} Personal Task`;
       case 'personal_reminders': return `${editPrefix} Personal Reminder`;
       case 'ideas': return `${editPrefix} Idea`;
-      case 'quotes': return `${editPrefix} Quote`;
+      case 'quotes': return `${editPrefix} Musing`;
       case 'goals_plans': return `${editPrefix} Goal / Plan`;
-      case 'musings': return `${editPrefix} Musing`;
+      case 'musings': return `${editPrefix} Journal Log`;
       case 'media': return `${editPrefix} Media Item`;
       case 'hobbies': return `${editPrefix} Hobby Log`;
       case 'work_tasks': return `${editPrefix} Work Task`;
@@ -541,13 +541,13 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             {category === 'quotes' && (
               <>
                 <div className="space-y-1">
-                  <label className="text-xs font-mono tracking-wider uppercase text-ink-muted">Quote Text</label>
+                  <label className="text-xs font-mono tracking-wider uppercase text-ink-muted">Musing Text</label>
                   <textarea
                     name="quote"
                     required
                     value={formData.quote || ''}
                     onChange={handleChange}
-                    placeholder="Write the quote..."
+                    placeholder="Write your musing..."
                     rows={3}
                     className="w-full bg-surface/40 border border-surface rounded-lg px-4 py-2.5 text-ink-primary outline-none focus:border-accent-personal transition-colors resize-none font-display font-light text-lg"
                   />
