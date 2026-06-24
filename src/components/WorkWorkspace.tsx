@@ -7,7 +7,7 @@ import { SmartCaptureModal } from './SmartCaptureModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Pin, CheckCircle2, Circle, Play, AlertCircle, 
-  Clock, FileText, Sparkles
+  Clock, FileText
 } from 'lucide-react';
 
 export const WorkWorkspace: React.FC = () => {
