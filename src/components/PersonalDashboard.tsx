@@ -31,11 +31,26 @@ export const PersonalDashboard: React.FC = () => {
   const [activePanel, setActivePanel] = useState<PanelType>('dashboard');
   const [dailyQuote, setDailyQuote] = useState<DailyQuote | null>(null);
 
-  // Fetch daily quote on mount
+  // Fetch daily quote on mount and on visibility change
   useEffect(() => {
-    fetchDailyQuote()
-      .then(setDailyQuote)
-      .catch((err) => console.error("Failed to fetch daily quote:", err));
+    const fetchQuote = () => {
+      fetchDailyQuote()
+        .then(setDailyQuote)
+        .catch((err) => console.error("Failed to fetch daily quote:", err));
+    };
+
+    fetchQuote();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchQuote();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   const handleSaveDailyQuote = async (e: React.MouseEvent) => {

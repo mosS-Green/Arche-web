@@ -48,17 +48,21 @@ const FALLBACK_QUOTES: DailyQuote[] = [
 
 const CACHE_KEY = "arche_daily_quote";
 const CACHE_TIME_KEY = "arche_daily_quote_timestamp";
-const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+const SESSION_FETCH_KEY = "arche_session_quote_fetched";
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
 export async function fetchDailyQuote(): Promise<DailyQuote> {
   const now = Date.now();
   const cachedQuote = localStorage.getItem(CACHE_KEY);
   const cachedTimestamp = localStorage.getItem(CACHE_TIME_KEY);
+  const sessionFetched = sessionStorage.getItem(SESSION_FETCH_KEY);
 
-  // Use cache if it exists and is less than 4 hours old
-  if (cachedQuote && cachedTimestamp) {
+  // If this is a new session, bypass cache to force attempt a fresh fetch
+  const isNewSession = !sessionFetched;
+
+  if (cachedQuote && cachedTimestamp && !isNewSession) {
     const timePassed = now - parseInt(cachedTimestamp, 10);
-    if (timePassed < FOUR_HOURS_MS) {
+    if (timePassed < TWO_HOURS_MS) {
       try {
         return JSON.parse(cachedQuote);
       } catch (e) {
@@ -66,6 +70,9 @@ export async function fetchDailyQuote(): Promise<DailyQuote> {
       }
     }
   }
+
+  // Mark session as fetched
+  sessionStorage.setItem(SESSION_FETCH_KEY, "true");
 
   // Fetch from free API
   try {
@@ -96,18 +103,23 @@ export async function fetchDailyQuote(): Promise<DailyQuote> {
   } catch (error) {
     console.warn("FavQs API fetch failed, using fallback or old cache:", error);
 
-    // If API fails, reuse the old cache (even if older than 4 hours)
+    let parsedCached: DailyQuote | null = null;
     if (cachedQuote) {
       try {
-        return JSON.parse(cachedQuote);
+        parsedCached = JSON.parse(cachedQuote);
       } catch (e) {
-        // Fall through to fallback
+        // Fall through
       }
     }
 
-    // Otherwise, pick a random fallback quote
-    const randomIndex = Math.floor(Math.random() * FALLBACK_QUOTES.length);
-    const fallback = FALLBACK_QUOTES[randomIndex];
+    // Filter out the currently cached quote to ensure variety
+    const availableFallbacks = parsedCached
+      ? FALLBACK_QUOTES.filter(q => q.quote !== parsedCached!.quote)
+      : FALLBACK_QUOTES;
+
+    const pickList = availableFallbacks.length > 0 ? availableFallbacks : FALLBACK_QUOTES;
+    const randomIndex = Math.floor(Math.random() * pickList.length);
+    const fallback = pickList[randomIndex];
 
     // Cache the fallback so we don't spam attempts
     localStorage.setItem(CACHE_KEY, JSON.stringify(fallback));

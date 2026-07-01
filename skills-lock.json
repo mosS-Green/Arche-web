@@ -13,6 +13,12 @@
       "skillPath": "skills/frontend-design/SKILL.md",
       "computedHash": "93f53fd1c0352d3d7ec17b8f73d7351bf76f4821e55d123c9d2abc2c53ba48e4"
     },
+    "gemini-interactions-api": {
+      "source": "google-gemini/gemini-skills",
+      "sourceType": "github",
+      "skillPath": "skills/gemini-interactions-api/SKILL.md",
+      "computedHash": "01a26a4d89e4250f12b213354a5539e2efe9925bb5796bab4c7a4b6541c64e70"
+    },
     "github-actions-docs": {
       "source": "xixu-me/skills",
       "sourceType": "github",

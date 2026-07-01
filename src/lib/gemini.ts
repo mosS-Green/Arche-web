@@ -20,8 +20,16 @@ export async function categorizeContent(
   const inputs: any[] = [];
 
   if (mediaBase64) {
-    const rawData = mediaBase64.includes(',') ? mediaBase64.split(',')[1] : mediaBase64;
-    const mimeType = mediaType === 'image' ? 'image/jpeg' : 'audio/mp3';
+    const hasDataPrefix = mediaBase64.includes(';base64,') || mediaBase64.includes(',');
+    const rawData = hasDataPrefix ? mediaBase64.split(',')[1] : mediaBase64;
+    let mimeType = mediaType === 'image' ? 'image/jpeg' : 'audio/mp3';
+    if (hasDataPrefix) {
+      const match = mediaBase64.match(/^data:([^;]+);/);
+      if (match && match[1]) {
+        mimeType = match[1];
+      }
+    }
+    console.log(`[Gemini API] Input media detected. Type: ${mediaType}, MIME: ${mimeType}, Size: ${rawData.length} bytes`);
     inputs.push({
       type: mediaType,
       data: rawData,
@@ -105,7 +113,16 @@ Provide the output strictly matching the required JSON schema.`;
     throw new Error("Empty response received from categorization agent.");
   }
 
-  return JSON.parse(text) as CategorizationResult;
+  console.log("[Gemini API] Categorization raw output:", text);
+  try {
+    const parsed = JSON.parse(text) as CategorizationResult;
+    if (!parsed || !Array.isArray(parsed.categories)) {
+      throw new Error("Invalid schema structure: 'categories' field is missing or not an array.");
+    }
+    return parsed;
+  } catch (e: any) {
+    throw new Error(`Failed to parse categorization response: ${e.message}. Raw output: ${text}`);
+  }
 }
 
 /**
@@ -306,8 +323,15 @@ export async function structureContent(
 
   const inputs: any[] = [];
   if (mediaBase64) {
-    const rawData = mediaBase64.includes(',') ? mediaBase64.split(',')[1] : mediaBase64;
-    const mimeType = mediaType === 'image' ? 'image/jpeg' : 'audio/mp3';
+    const hasDataPrefix = mediaBase64.includes(';base64,') || mediaBase64.includes(',');
+    const rawData = hasDataPrefix ? mediaBase64.split(',')[1] : mediaBase64;
+    let mimeType = mediaType === 'image' ? 'image/jpeg' : 'audio/mp3';
+    if (hasDataPrefix) {
+      const match = mediaBase64.match(/^data:([^;]+);/);
+      if (match && match[1]) {
+        mimeType = match[1];
+      }
+    }
     inputs.push({
       type: mediaType,
       data: rawData,
@@ -348,5 +372,16 @@ export async function structureContent(
     throw new Error("Empty response received from data structuring agent.");
   }
 
-  return JSON.parse(text) as Record<string, any[]>;
+  console.log("[Gemini API] Structuring raw output:", text);
+  try {
+    const parsed = JSON.parse(text) as Record<string, any[]>;
+    // Validate that at least one of the requested categories is returned in the object
+    const keys = Object.keys(parsed);
+    if (keys.length === 0) {
+      throw new Error("No category arrays found in the structured output object.");
+    }
+    return parsed;
+  } catch (e: any) {
+    throw new Error(`Failed to parse structuring response: ${e.message}. Raw output: ${text}`);
+  }
 }

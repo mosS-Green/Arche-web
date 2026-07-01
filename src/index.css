@@ -23,9 +23,7 @@
 /* Base custom styles to respect user accessibility and standard reset details */
 @layer base {
   body {
-    background: linear-gradient(-45deg, oklch(0.08 0.015 250), oklch(0.12 0.015 250), oklch(0.09 0.015 230), oklch(0.13 0.02 260));
-    background-size: 400% 400%;
-    animation: slow-gradient 40s ease infinite;
+    background: var(--color-bg);
     color: var(--color-ink-primary);
     font-family: var(--font-sans);
     overflow-x: hidden;
@@ -85,15 +83,5 @@
   }
 }
 
-@keyframes slow-gradient {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
+
 

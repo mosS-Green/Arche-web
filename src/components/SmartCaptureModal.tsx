@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { 
   Camera, Mic, X, Check, Loader2, Square, 
-  RefreshCw, Send, AlertCircle, FileText, Sparkles
+  RefreshCw, Send, AlertCircle, FileText, Sparkles,
+  Play, Pause
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { categorizeContent, structureContent } from '../lib/gemini';
@@ -20,7 +21,7 @@ interface SmartCaptureModalProps {
   } | null;
 }
 
-type ModeType = 'choice' | 'camera' | 'microphone' | 'preview_image' | 'preview_audio' | 'preview_text' | 'processing' | 'success';
+type ModeType = 'choice' | 'camera' | 'microphone' | 'preview_image' | 'preview_audio' | 'preview_text' | 'processing' | 'success' | 'error';
 
 export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
   isOpen,
@@ -37,6 +38,7 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   
   const [capturedBase64, setCapturedBase64] = useState<string | null>(null);
@@ -50,6 +52,12 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioIntervalRef = useRef<number | null>(null);
+  
+  // Audio Visualizer refs
+  const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
 
   // Process initialIntent on change
   useEffect(() => {
@@ -80,7 +88,7 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
 
   // Audio timer
   useEffect(() => {
-    if (isRecording) {
+    if (isRecording && !isPaused) {
       audioIntervalRef.current = window.setInterval(() => {
         setRecordingSeconds((prev) => prev + 1);
       }, 1000);
@@ -88,12 +96,62 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
       if (audioIntervalRef.current) {
         clearInterval(audioIntervalRef.current);
       }
-      setRecordingSeconds(0);
     }
     return () => {
       if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
     };
-  }, [isRecording]);
+  }, [isRecording, isPaused]);
+
+  // Audio Visualizer drawing loop
+  useEffect(() => {
+    if (mode === 'microphone' && isRecording && analyserRef.current && waveformCanvasRef.current) {
+      const canvas = waveformCanvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const analyser = analyserRef.current;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      const draw = () => {
+        if (mode !== 'microphone') return;
+        animFrameRef.current = requestAnimationFrame(draw);
+        
+        analyser.getByteFrequencyData(dataArray);
+        
+        if (ctx) {
+          // Dark background overlay with decay trail effect
+          ctx.fillStyle = 'rgba(16, 20, 24, 0.35)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          const barWidth = (canvas.width / bufferLength) * 1.5;
+          let x = 0;
+          
+          // Use active theme personal accent color
+          const accentColor = getComputedStyle(document.documentElement)
+            .getPropertyValue('--color-accent-personal').trim() || 'oklch(0.75 0.13 185)';
+          
+          for (let i = 0; i < bufferLength; i++) {
+            const barHeight = (dataArray[i] / 255) * (canvas.height * 0.85);
+            
+            ctx.fillStyle = accentColor;
+            const y = (canvas.height - barHeight) / 2;
+            
+            // Draw rounded or solid vertical bars
+            ctx.fillRect(x, y, barWidth - 2, barHeight);
+            x += barWidth;
+          }
+        }
+      };
+      
+      draw();
+    }
+    
+    return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+    };
+  }, [mode, isRecording, isPaused]);
 
   const cleanupMedia = () => {
     if (cameraStream) {
@@ -110,6 +168,20 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
       clearInterval(audioIntervalRef.current);
     }
     setIsRecording(false);
+    setIsPaused(false);
+    
+    // Visualizer cleanup
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      if (audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close();
+      }
+      audioCtxRef.current = null;
+    }
+    analyserRef.current = null;
   };
 
   // Camera Actions
@@ -154,10 +226,23 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
   // Microphone Actions
   const startRecording = async () => {
     setErrorMsg(null);
+    setIsPaused(false);
     try {
       cleanupMedia();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      
+      // MimeType detection
+      let recordMimeType = 'audio/webm';
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        recordMimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+        recordMimeType = 'audio/ogg;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        recordMimeType = 'audio/mp4';
+      }
+
+      console.log(`[MediaRecorder] Initializing with codec: ${recordMimeType}`);
+      const recorder = new MediaRecorder(stream, { mimeType: recordMimeType });
       const chunks: Blob[] = [];
 
       recorder.ondataavailable = (e) => {
@@ -165,7 +250,7 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/mp3' });
+        const blob = new Blob(chunks, { type: recordMimeType });
         setAudioUrl(URL.createObjectURL(blob));
         
         // Convert blob to Base64 for Gemini
@@ -181,6 +266,16 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
         stream.getTracks().forEach((track) => track.stop());
       };
 
+      // Web Audio Analyser setup for waveform visualization
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64; // Fewer bins for bolder visualizer lines
+      source.connect(analyser);
+      
+      audioCtxRef.current = audioCtx;
+      analyserRef.current = analyser;
+
       setMediaRecorder(recorder);
       recorder.start();
       setIsRecording(true);
@@ -192,10 +287,25 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
     }
   };
 
+  const pauseRecording = () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.pause();
+      setIsPaused(true);
+    }
+  };
+
+  const resumeRecording = () => {
+    if (mediaRecorder && mediaRecorder.state === 'paused') {
+      mediaRecorder.resume();
+      setIsPaused(false);
+    }
+  };
+
   const stopRecording = () => {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    if (mediaRecorder && (mediaRecorder.state === 'recording' || mediaRecorder.state === 'paused')) {
       mediaRecorder.stop();
       setIsRecording(false);
+      setIsPaused(false);
     }
   };
 
@@ -272,9 +382,9 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
         throw new Error("No database records were extracted by the AI.");
       }
 
-      // Reload UI states
-      if (hasPersonalData) await loadPersonalData();
-      if (hasWorkData) await loadWorkData();
+      // Reload UI states forcing reload of personal/work data
+      if (hasPersonalData) await loadPersonalData(true);
+      if (hasWorkData) await loadWorkData(true);
 
       setActiveStep(4);
       setStepStatus(`Successfully logged ${insertedCount} entries!`);
@@ -290,8 +400,7 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
     } catch (err: any) {
       console.error('Smart Capture Pipeline failed:', err);
       setErrorMsg(err.message || 'An error occurred during Gemini AI processing.');
-      setMode('camera');
-      startCamera();
+      setMode('error'); // Toggle to error state
     }
   };
 
@@ -304,29 +413,38 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-bg/85 backdrop-blur-md z-50 transition-opacity" />
+        {/* Only render backdrop when not in fullscreen camera or mic modes */}
+        {mode !== 'camera' && mode !== 'microphone' && (
+          <Dialog.Overlay className="fixed inset-0 bg-bg/85 backdrop-blur-md z-50 transition-opacity" />
+        )}
         <Dialog.Content 
-          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-surface border border-surface rounded-2xl p-6 md:p-8 shadow-2xl z-50 outline-none max-h-[90vh] overflow-y-auto"
+          className={
+            mode === 'camera' || mode === 'microphone'
+              ? "fixed inset-0 bg-black text-ink-primary z-50 outline-none w-full h-full flex flex-col justify-between overflow-hidden"
+              : "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-surface border border-surface rounded-2xl p-6 md:p-8 shadow-2xl z-50 outline-none max-h-[90vh] overflow-y-auto"
+          }
           onOpenAutoFocus={() => {
             // Let input handle focus if present
           }}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between pb-4 border-b border-surface/50 mb-6">
-            <Dialog.Title className="text-xl font-display font-medium text-ink-primary flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-accent-personal animate-pulse" />
-              Smart Capture
-            </Dialog.Title>
-            <Dialog.Close 
-              onClick={cleanupMedia}
-              className="p-1 rounded-full text-ink-muted hover:text-ink-primary hover:bg-surface-hover transition-colors duration-200 cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </Dialog.Close>
-          </div>
+          {/* Header (Hidden in Fullscreen views) */}
+          {mode !== 'camera' && mode !== 'microphone' && (
+            <div className="flex items-center justify-between pb-4 border-b border-surface/50 mb-6">
+              <Dialog.Title className="text-xl font-display font-medium text-ink-primary flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-accent-personal animate-pulse" />
+                Smart Capture
+              </Dialog.Title>
+              <Dialog.Close 
+                onClick={cleanupMedia}
+                className="p-1 rounded-full text-ink-muted hover:text-ink-primary hover:bg-surface-hover transition-colors duration-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </Dialog.Close>
+            </div>
+          )}
 
-          {/* Error Message banner */}
-          {errorMsg && (
+          {/* Error Message banner (only in preview and other standard modes) */}
+          {errorMsg && mode !== 'error' && mode !== 'camera' && mode !== 'microphone' && (
             <div className="bg-danger/10 border border-danger/25 text-danger rounded-xl p-4 mb-6 flex items-start gap-2.5 text-xs font-mono">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{errorMsg}</span>
@@ -337,40 +455,51 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
           
           {/* Mode 2: Camera View */}
           {mode === 'camera' && (
-            <div className="space-y-6">
-              <div className="relative aspect-[3/4] max-h-[50vh] bg-black rounded-xl overflow-hidden border border-surface shadow-inner">
-                <video 
-                  ref={videoRef} 
-                  autoPlay 
-                  playsInline 
-                  className="w-full h-full object-cover"
-                />
-                <canvas ref={canvasRef} className="hidden" />
-              </div>
+            <div className="relative w-full h-full bg-black flex flex-col justify-end">
+              {/* Fullscreen Video */}
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted
+                className="absolute inset-0 w-full h-full object-cover z-0"
+              />
+              <canvas ref={canvasRef} className="hidden" />
 
-              <div className="flex justify-center items-center gap-4">
+              {/* Clean bottom controls */}
+              <div className="relative z-10 flex justify-around items-center px-8 py-10 bg-gradient-to-t from-black/85 to-transparent w-full">
+                {/* Close/Cancel */}
                 <button
-                  onClick={onClose}
-                  className="px-5 py-2.5 bg-surface hover:bg-surface-hover rounded-xl text-xs font-mono uppercase text-ink-secondary cursor-pointer transition-colors"
+                  onClick={() => {
+                    cleanupMedia();
+                    onClose();
+                  }}
+                  className="p-4 bg-white/15 hover:bg-white/25 active:bg-white/30 backdrop-blur-md rounded-full text-white cursor-pointer transition-colors"
+                  title="Close Camera"
                 >
-                  Cancel
+                  <X className="w-6 h-6" />
                 </button>
+
+                {/* Capture snapshot */}
                 <button
                   onClick={captureSnapshot}
-                  className="px-6 py-2.5 bg-accent-personal text-bg rounded-xl text-xs font-mono uppercase font-semibold hover:bg-accent-personal/90 cursor-pointer transition-transform hover:scale-[1.02] flex items-center gap-1.5"
+                  className="w-20 h-20 bg-white hover:bg-white/90 active:scale-95 border-4 border-white/20 rounded-full flex items-center justify-center cursor-pointer transition-all duration-150 animate-fade-in"
+                  aria-label="Capture Photo"
                 >
-                  <Camera className="w-4 h-4" /> Capture Photo
+                  <div className="w-16 h-16 bg-white border border-black/10 rounded-full" />
                 </button>
+
+                {/* Switch to Voice */}
                 <button
                   onClick={() => {
                     cleanupMedia();
                     setMode('microphone');
                     startRecording();
                   }}
-                  className="p-3 bg-surface hover:bg-surface-hover rounded-xl text-ink-primary cursor-pointer transition-colors"
+                  className="p-4 bg-white/15 hover:bg-white/25 active:bg-white/30 backdrop-blur-md rounded-full text-white cursor-pointer transition-colors"
                   title="Switch to Voice Recording"
                 >
-                  <Mic className="w-5 h-5 text-accent-work" />
+                  <Mic className="w-6 h-6 text-accent-personal" />
                 </button>
               </div>
             </div>
@@ -378,41 +507,71 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
 
           {/* Mode 3: Microphone View */}
           {mode === 'microphone' && (
-            <div className="space-y-8 py-6 text-center">
-              <div className="flex flex-col items-center space-y-4">
-                {/* Pulse wave animation */}
-                <div className="relative flex items-center justify-center">
-                  <span className="absolute w-20 h-20 bg-accent-work/20 rounded-full animate-ping" />
-                  <span className="absolute w-16 h-16 bg-accent-work/30 rounded-full animate-pulse-slow" />
-                  <div className="relative w-12 h-12 bg-accent-work text-bg rounded-full flex items-center justify-center shadow-lg">
-                    <Mic className="w-5 h-5 animate-pulse" />
-                  </div>
-                </div>
-                
-                <span className="text-2xl font-mono text-ink-primary font-semibold">
-                  {formatTime(recordingSeconds)}
-                </span>
-                <span className="text-xs font-mono text-ink-muted uppercase tracking-wider">
-                  RECORDING ACTIVE...
+            <div className="relative w-full h-full bg-bg flex flex-col justify-between p-8">
+              {/* Header spacer or info */}
+              <div className="pt-8 text-center">
+                <span className="text-[10px] font-mono text-ink-muted uppercase tracking-widest">
+                  Smart Audio Capture
                 </span>
               </div>
 
-              <div className="flex justify-center gap-4">
+              {/* Waveform visualizer */}
+              <div className="flex flex-col items-center justify-center flex-1 space-y-6">
+                <div className="relative w-full max-w-sm flex items-center justify-center">
+                  {/* Waveform Canvas */}
+                  <canvas
+                    ref={waveformCanvasRef}
+                    className="w-full h-32 rounded-2xl bg-surface/30 border border-surface/50"
+                    width={320}
+                    height={128}
+                  />
+                  {/* Glowing center indicator */}
+                  {!isPaused && (
+                    <div className="absolute w-6 h-6 bg-accent-personal/20 rounded-full animate-ping pointer-events-none" />
+                  )}
+                </div>
+
+                <div className="text-center space-y-2">
+                  <span className="block text-3xl font-mono text-ink-primary font-semibold tracking-wider">
+                    {formatTime(recordingSeconds)}
+                  </span>
+                  <span className="text-[10px] font-mono text-ink-muted uppercase tracking-widest animate-pulse">
+                    {isPaused ? 'RECORDING PAUSED' : 'RECORDING ACTIVE'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Bottom controls */}
+              <div className="flex justify-center items-center gap-6 pb-8">
+                {/* Cancel and switch back to camera */}
                 <button
                   onClick={() => {
                     cleanupMedia();
                     setMode('camera');
                     startCamera();
                   }}
-                  className="px-5 py-2.5 bg-surface hover:bg-surface-hover rounded-xl text-xs font-mono uppercase text-ink-secondary cursor-pointer"
+                  className="p-4 bg-surface hover:bg-surface-hover rounded-full text-ink-secondary hover:text-ink-primary cursor-pointer transition-colors"
+                  title="Cancel and switch to camera"
                 >
-                  Cancel
+                  <Camera className="w-5 h-5" />
                 </button>
+
+                {/* Pause / Resume */}
+                <button
+                  onClick={isPaused ? resumeRecording : pauseRecording}
+                  className="p-5 bg-surface hover:bg-surface-hover rounded-full text-accent-personal cursor-pointer transition-colors"
+                  title={isPaused ? "Resume Recording" : "Pause Recording"}
+                >
+                  {isPaused ? <Play className="w-6 h-6 fill-accent-personal" /> : <Pause className="w-6 h-6 fill-accent-personal" />}
+                </button>
+
+                {/* Stop & save */}
                 <button
                   onClick={stopRecording}
-                  className="px-6 py-2.5 bg-danger text-ink-primary rounded-xl text-xs font-mono uppercase font-semibold hover:bg-danger/90 flex items-center gap-1.5 cursor-pointer"
+                  className="p-5 bg-danger text-bg hover:bg-danger/90 rounded-full cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                  title="Stop and process audio"
                 >
-                  <Square className="w-3.5 h-3.5 fill-ink-primary" /> Stop Recording
+                  <Square className="w-5 h-5 fill-bg stroke-none" />
                 </button>
               </div>
             </div>
@@ -552,7 +711,6 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
                   placeholder="Add details, directives, or category notes before submitting..."
                   rows={2}
                   className="w-full bg-surface/40 border border-surface rounded-xl px-4 py-3 text-sm text-ink-primary outline-none focus:border-accent-personal transition-colors resize-none font-sans"
-                  // Use this value to prepend/append or let user modify the shared text
                   onChange={(e) => setComment(e.target.value)}
                   value={comment}
                 />
@@ -648,6 +806,43 @@ export const SmartCaptureModal: React.FC<SmartCaptureModalProps> = ({
               <p className="text-xs font-mono text-ink-muted uppercase tracking-wider">
                 {stepStatus}
               </p>
+            </div>
+          )}
+
+          {/* Mode: Error View */}
+          {mode === 'error' && (
+            <div className="space-y-6 py-6 text-center">
+              <div className="w-16 h-16 bg-danger/10 text-danger rounded-full flex items-center justify-center mx-auto">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-display font-medium text-ink-primary">Processing Failed</h3>
+                <p className="text-xs font-mono text-ink-muted uppercase tracking-wider">
+                  Gemini API or Database Error
+                </p>
+              </div>
+              <div className="bg-danger/5 border border-danger/10 rounded-xl p-4 text-left max-h-32 overflow-y-auto">
+                <p className="text-xs font-mono text-danger break-all">{errorMsg}</p>
+              </div>
+
+              <div className="flex justify-center gap-4 pt-2">
+                <button
+                  onClick={() => {
+                    setErrorMsg(null);
+                    setMode('camera');
+                    startCamera();
+                  }}
+                  className="px-5 py-2.5 bg-surface hover:bg-surface-hover rounded-xl text-xs font-mono uppercase text-ink-secondary cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleProcessAndInsert}
+                  className="px-6 py-2.5 bg-accent-personal text-bg rounded-xl text-xs font-mono uppercase font-semibold hover:bg-accent-personal/90 flex items-center gap-1.5 cursor-pointer"
+                >
+                  Retry
+                </button>
+              </div>
             </div>
           )}
 

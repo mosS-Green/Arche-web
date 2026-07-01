@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { applyRandomAccent } from '../lib/theme';
 
 // ============================================================================
 // TypeScript Type Definitions
@@ -176,8 +177,8 @@ interface AppContextType {
   
   personalLoaded: boolean;
   workLoaded: boolean;
-  loadPersonalData: () => Promise<void>;
-  loadWorkData: () => Promise<void>;
+  loadPersonalData: (force?: boolean) => Promise<void>;
+  loadWorkData: (force?: boolean) => Promise<void>;
   
   personalTasks: PersonalTask[];
   personalReminders: PersonalReminder[];
@@ -234,6 +235,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Initial App Setup
   useEffect(() => {
+    // Apply random accent color palette on startup
+    applyRandomAccent();
+
     const initApp = async () => {
       const storedId = localStorage.getItem('arche_user_id');
       if (!storedId) {
@@ -254,18 +258,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data) {
           setUserId(storedId);
           setProfile(data);
+          localStorage.setItem('arche_display_name', data.display_name); // Cache name locally
           setIsOnboardingRequired(false);
         } else {
           localStorage.removeItem('arche_user_id');
+          localStorage.removeItem('arche_display_name');
           setIsOnboardingRequired(true);
         }
       } catch (err) {
         console.warn('Supabase profile check failed, trying offline fallback:', err);
         // Offline fallback - trust localStorage cache
         setUserId(storedId);
+        const cachedName = localStorage.getItem('arche_display_name') || 'Owner';
         setProfile({
           id: storedId,
-          display_name: 'Owner',
+          display_name: cachedName,
           updated_at: new Date().toISOString()
         });
         setIsOnboardingRequired(false);
@@ -277,8 +284,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     initApp();
   }, []);
 
-  const loadPersonalData = async () => {
-    if (personalLoaded || !userId) return;
+  const loadPersonalData = async (force?: boolean) => {
+    if ((!force && personalLoaded) || !userId) return;
     try {
       const [
         tasksRes,
@@ -324,8 +331,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const loadWorkData = async () => {
-    if (workLoaded || !userId) return;
+  const loadWorkData = async (force?: boolean) => {
+    if ((!force && workLoaded) || !userId) return;
     try {
       const [tasksRes, remindersRes, notesRes] = await Promise.all([
         supabase.from('work_tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
@@ -363,6 +370,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (existingProfile) {
         localStorage.setItem('arche_user_id', existingProfile.id);
+        localStorage.setItem('arche_display_name', existingProfile.display_name); // Cache name locally
         setUserId(existingProfile.id);
         setProfile(existingProfile);
         setIsOnboardingRequired(false);
@@ -380,6 +388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (insertError) throw insertError;
 
       localStorage.setItem('arche_user_id', newId);
+      localStorage.setItem('arche_display_name', name); // Cache name locally
       setUserId(newId);
       setProfile({ ...newProfile, updated_at: new Date().toISOString() });
       setIsOnboardingRequired(false);
